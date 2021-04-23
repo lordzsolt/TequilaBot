@@ -1,6 +1,6 @@
 package bot
 
-type state int
+type state = int
 
 const (
 	listening state = iota

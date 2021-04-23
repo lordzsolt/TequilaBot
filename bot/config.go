@@ -4,19 +4,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"os"
 )
+
 
 type Config struct {
 	Token     string `json:Token`
 	BotPrefix string `json:BotPrefix`
 	SetupChannelID string `json:SetupChannelID`
+	SetupAbortPhrase string `json:SetupAbortPhrase`
 }
 
 func ReadConfig() (*Config, error) {
 	fmt.Println("Reading config")
-
-	fmt.Println(os.Getwd())
 
 	file, err := ioutil.ReadFile("./config.json")
 	if err != nil {

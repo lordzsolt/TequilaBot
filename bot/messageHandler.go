@@ -7,6 +7,19 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
+var configurationMessages = [...]string{
+	"Step 1: Which channel would you like the message to be in?",
+	"Step 2: How would you like your message to look like? Use a `|` to separate the title from the description, like so:\n" +
+		"> `Title | Description`",
+	"Step 3: Would you like your message to have a color? Respond with the hex color or **none**.",
+	"Step 4: Finally, let's add roles. Add the emoji, then the name of the role.\n" +
+		"Typing the same emoji a second time will override the previous role.\n" +
+		// "To remove an emoji, type `remove :lemon:`\n" +
+		"Type **done** when you are finished.\n" +
+		"> Example: `:lemon: @Alcoholic`",
+	"Good job! Above you can see how the final message looks like. Type **yes** to post it or **no** to discard it and start again",
+}
+
 func messageCreated(session *discordgo.Session, message *discordgo.MessageCreate) {
 	if message.Author.ID == session.State.User.ID {
 		return
@@ -15,11 +28,9 @@ func messageCreated(session *discordgo.Session, message *discordgo.MessageCreate
 		return
 	}
 
-	fmt.Println(message.Content)
-
 	switch currentState {
 	case listening:
-		if isBotCommand(message, config.BotPrefix) {
+		if isBotCommand(message, config.StartPhrase) {
 			startConfiguring(session)
 		}
 	case configuring:
@@ -30,28 +41,38 @@ func messageCreated(session *discordgo.Session, message *discordgo.MessageCreate
 func startConfiguring(session *discordgo.Session) {
 	currentState = configuring
 	configurationStep = 0
-	messageBeingConfigured = &roleReactionMessage{
-		reactions: map[string]string{},
-	}
+	roleReactionBeingConfigured = newRoleReactionMessage()
 	sendReply(session, configurationMessages[configurationStep])
 }
 
+func finishConfiguring() {
+	watchedMessages[roleReactionBeingConfigured.MessageID] = *roleReactionBeingConfigured
+
+	err := saveReactions()
+	if err != nil {
+		fmt.Printf("Failed to save reactions: %v", err.Error())
+	}
+
+	currentState = listening
+	roleReactionBeingConfigured = nil
+}
+
 func handleConfigurationMessage(session *discordgo.Session, message *discordgo.MessageCreate) {
-	if isBotCommand(message, config.SetupAbortPhrase) {
+	if isBotCommand(message, "abort") {
 		currentState = listening
 		return
 	}
 
 	switch configurationStep {
 	case 0:
-		channelID := strings.Trim(message.Content, "<#>")
-		messageBeingConfigured.channelID = channelID
-		reply := fmt.Sprintf("Alright. The channel is <#%s>", channelID)
+		ChannelID := strings.Trim(message.Content, "<#>")
+		roleReactionBeingConfigured.ChannelID = ChannelID
+		reply := fmt.Sprintf("Alright. The channel is <#%s>", ChannelID)
 		sendReply(session, reply)
 	case 1:
-		messageBeingConfigured.updateTitleAndDescription(message.Content)
+		roleReactionBeingConfigured.updateTitleAndDescription(message.Content)
 	case 2:
-		err := messageBeingConfigured.updateColor(message.Content)
+		err := roleReactionBeingConfigured.updateColor(message.Content)
 
 		if err != nil {
 			reply := fmt.Sprintf("Error converting color: %v\nTry again, or type `none` to leave message without color", err.Error())
@@ -60,7 +81,7 @@ func handleConfigurationMessage(session *discordgo.Session, message *discordgo.M
 		}
 
 		sendReply(session, "Perfect. This is how your message will look like:")
-		messageBeingConfigured.messageID = sendCurrentMessage(session)
+		roleReactionBeingConfigured.MessageID = sendCurrentMessage(session)
 	case 3:
 		if isBotCommand(message, "done") {
 			// TODO: Add option to jump to steps and make corrections
@@ -68,23 +89,14 @@ func handleConfigurationMessage(session *discordgo.Session, message *discordgo.M
 			break
 		}
 
-		emoji, role := parseReaction(message.Content)
-
-		if len(emoji) == 0 {
-			fmt.Println("Could not parse emoji from: ", message)
-			return
-		}
-
-		if len(role) == 0 {
-			fmt.Println("Could not parse role from: ", message)
-			return
-		}
+		emoji, r := parseReaction(message.Content)
 
 		// TODO: Make sure role exists
 
-		messageBeingConfigured.reactions[emoji] = role
-		messageBeingConfigured.messageID = updateCurrentMessage(session)
-		err := session.MessageReactionAdd(config.SetupChannelID, messageBeingConfigured.messageID, emoji)
+		roleReactionBeingConfigured.Reactions[emoji] = r
+		roleReactionBeingConfigured.MessageID = updateCurrentMessage(session)
+
+		err := session.MessageReactionAdd(config.SetupChannelID, roleReactionBeingConfigured.MessageID, emoji)
 		if err != nil {
 			fmt.Println("Error adding reaction: ", err.Error())
 		}
@@ -94,10 +106,10 @@ func handleConfigurationMessage(session *discordgo.Session, message *discordgo.M
 		if isBotCommand(message, "yes") {
 			err := postFinalMessage(session)
 			if err != nil {
-				reply := fmt.Sprintf("Failed to post final message: %v\nType **yes** to try again.", err.Error())
+				reply := fmt.Sprintf("Failed to post final message: %v\nType **yes** to try again or **no** to abort and start from the beginning", err.Error())
 				sendReply(session, reply)
 			} else {
-				currentState = listening
+				finishConfiguring()
 			}
 		} else if isBotCommand(message, "no") {
 			currentState = listening
@@ -115,7 +127,7 @@ func handleConfigurationMessage(session *discordgo.Session, message *discordgo.M
 }
 
 func sendCurrentMessage(session *discordgo.Session) string {
-	msg, err := session.ChannelMessageSendComplex(config.SetupChannelID, messageBeingConfigured.toDiscordMessage())
+	msg, err := session.ChannelMessageSendComplex(config.SetupChannelID, roleReactionBeingConfigured.toDiscordMessage())
 
 	if err != nil {
 		fmt.Println("Failed to send message: ", err.Error())
@@ -130,7 +142,7 @@ func sendCurrentMessage(session *discordgo.Session) string {
 }
 
 func updateCurrentMessage(session *discordgo.Session) string {
-	msg, err := session.ChannelMessageEditEmbed(config.SetupChannelID, messageBeingConfigured.messageID, messageBeingConfigured.toEmbed())
+	msg, err := session.ChannelMessageEditEmbed(config.SetupChannelID, roleReactionBeingConfigured.MessageID, roleReactionBeingConfigured.toEmbed())
 
 	if err != nil {
 		fmt.Println("Failed to edit message: ", err.Error())
@@ -145,28 +157,33 @@ func updateCurrentMessage(session *discordgo.Session) string {
 }
 
 func parseReaction(message string) (emoji string, role string) {
-	parts := strings.Fields(message)
-	if len(parts) != 2 {
-		fmt.Println("Could not create role from message: ", message)
-		return "", ""
+	trimmed := strings.Trim(message, " ")
+	parts := strings.Fields(trimmed)
+
+	if len(parts) > 2 {
+		fmt.Println("Warning: reaction / role message might have too many spaces")
 	}
 
-	return parts[0], parts[1]
+	emoji = findEmojiIdentiferInMessage(parts[0])
+	role = strings.Trim(parts[len(parts) - 1], "<@&>")
+	return
 }
 
 func postFinalMessage(session *discordgo.Session) error {
-	msg, err := session.ChannelMessageSendComplex(messageBeingConfigured.channelID, messageBeingConfigured.toDiscordMessage())
+	msg, err := session.ChannelMessageSendComplex(roleReactionBeingConfigured.ChannelID, roleReactionBeingConfigured.toDiscordMessage())
 
 	if err != nil {
 		return err
 	}
 
-	for emoji, _ := range messageBeingConfigured.reactions {
+	for emoji, _ := range roleReactionBeingConfigured.Reactions {
 		err := session.MessageReactionAdd(config.SetupChannelID, msg.ID, emoji)
 		if err != nil {
 			return err
 		}
 	}
+
+	roleReactionBeingConfigured.MessageID = msg.ID
 
 	return nil
 }

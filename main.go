@@ -9,7 +9,7 @@ func main() {
 	config, err := bot.ReadConfig()
 
 	if err != nil {
-		fmt.Println(err.Error())
+		fmt.Printf("Failed to read config: %v\n", err.Error())
 		return
 	}
 

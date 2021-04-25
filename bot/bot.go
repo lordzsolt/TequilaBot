@@ -11,24 +11,11 @@ import (
 )
 
 var (
-	config                 *Config
-	currentState           state
-	configurationStep      int
-	messageBeingConfigured *roleReactionMessage
+	config                      *Config
+	currentState                state
+	configurationStep           int
+	roleReactionBeingConfigured *roleReaction
 )
-
-var configurationMessages = [...]string{
-	"Step 1: Which channel would you like the message to be in?",
-	"Step 2: How would you like your message to look like? Use a `|` to separate the title from the description, like so:\n" +
-		"> `Title | Description`",
-	"Step 3: Would you like your message to have a color? Respond with the hex color or **none**.",
-	"Step 4: Finally, let's add roles. Add the emoji, then the name of the role.\n" +
-		"Typing the same emoji a second time will override the previous role.\n" +
-		// "To remove an emoji, type `remove :lemon:`\n" +
-		"Type **done** when you are finished.\n" +
-		"> Example: `:lemon: @Alcoholic`",
-	"Good job! Above you can see how the final message looks like. Type **yes** to post it or **no** to discard it and start again",
-}
 
 func Start(c *Config) error {
 	config = c
@@ -38,8 +25,14 @@ func Start(c *Config) error {
 		return err
 	}
 
+	err = readReactions()
+	if err != nil {
+		return err
+	}
+
 	session.AddHandler(messageCreated)
 	session.AddHandler(reactionAdd)
+	session.AddHandler(reactionRemove)
 
 	session.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsGuildMessageReactions
 
@@ -50,8 +43,6 @@ func Start(c *Config) error {
 
 	fmt.Println("Bot is running")
 
-	test(session)
-
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt, os.Kill)
 
@@ -60,19 +51,12 @@ func Start(c *Config) error {
 	return session.Close()
 }
 
-func test(session *discordgo.Session) {
-	// startConfiguring(session)
-	// messageBeingConfigured.title = "Lemon is gay"
-	// messageBeingConfigured.description = "Uhum..."
-	// messageBeingConfigured.messageID = "834914029486604298"
-	// configurationStep = 3
-}
-
 func isBotCommand(message *discordgo.MessageCreate, command string) bool {
 	return strings.ToLower(message.Content) == command
 }
 
 func sendReply(session *discordgo.Session, message string) {
+	fmt.Println("Sending reply: ", message)
 	_, err := session.ChannelMessageSend(config.SetupChannelID, message)
 
 	if err != nil {

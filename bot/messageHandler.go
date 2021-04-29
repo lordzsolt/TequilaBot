@@ -177,7 +177,7 @@ func postFinalMessage(session *discordgo.Session) error {
 	}
 
 	for emoji, _ := range roleReactionBeingConfigured.Reactions {
-		err := session.MessageReactionAdd(config.SetupChannelID, msg.ID, emoji)
+		err := session.MessageReactionAdd(msg.ChannelID, msg.ID, emoji)
 		if err != nil {
 			return err
 		}

@@ -34,7 +34,10 @@ func Start(c *Config) error {
 	session.AddHandler(reactionAdd)
 	session.AddHandler(reactionRemove)
 
-	session.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsGuildMessageReactions
+	session.Identify.Intents =
+		discordgo.IntentsGuildMessages |
+		discordgo.IntentsGuildMessageReactions |
+		discordgo.IntentsGuildMembers
 
 	err = session.Open()
 	if err != nil {

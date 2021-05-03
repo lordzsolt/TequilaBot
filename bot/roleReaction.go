@@ -15,11 +15,13 @@ type roleReaction struct {
 	Description string            `json:"description"`
 	Color       int               `json:"color"`
 	Reactions   map[string]string `json:"reactions"`
+	Emojis 		map[string]Emoji  `json:"emojis"`
 }
 
 func newRoleReactionMessage() *roleReaction {
 	return &roleReaction{
 		Reactions: map[string]string{},
+		Emojis: map[string]Emoji{},
 	}
 }
 
@@ -32,8 +34,9 @@ func (rrm roleReaction) toEmbed() *discordgo.MessageEmbed {
 		embed.Description += "\n"
 	}
 
-	for emoji, role := range rrm.Reactions {
-		embed.Description += fmt.Sprintf("\n%v <@&%v>", emoji, role)
+	for emojiName, role := range rrm.Reactions {
+		emoji := rrm.Emojis[emojiName]
+		embed.Description += fmt.Sprintf("\n%v <@&%v>", emoji.asMessage(), role)
 	}
 
 	embed.Color = rrm.Color

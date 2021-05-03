@@ -93,10 +93,11 @@ func handleConfigurationMessage(session *discordgo.Session, message *discordgo.M
 
 		// TODO: Make sure role exists
 
-		roleReactionBeingConfigured.Reactions[emoji] = r
+		roleReactionBeingConfigured.Reactions[emoji.Name] = r
+		roleReactionBeingConfigured.Emojis[emoji.Name] = emoji
 		roleReactionBeingConfigured.MessageID = updateCurrentMessage(session)
 
-		err := session.MessageReactionAdd(config.SetupChannelID, roleReactionBeingConfigured.MessageID, emoji)
+		err := session.MessageReactionAdd(config.SetupChannelID, roleReactionBeingConfigured.MessageID, emoji.asReaction())
 		if err != nil {
 			fmt.Println("Error adding reaction: ", err.Error())
 		}
@@ -142,7 +143,13 @@ func sendCurrentMessage(session *discordgo.Session) string {
 }
 
 func updateCurrentMessage(session *discordgo.Session) string {
-	msg, err := session.ChannelMessageEditEmbed(config.SetupChannelID, roleReactionBeingConfigured.MessageID, roleReactionBeingConfigured.toEmbed())
+	var edit = discordgo.MessageEdit{
+		ID: roleReactionBeingConfigured.MessageID,
+		Channel: config.SetupChannelID,
+		Embed: roleReactionBeingConfigured.toEmbed(),
+	}
+
+	msg, err := session.ChannelMessageEditComplex(&edit)
 
 	if err != nil {
 		fmt.Println("Failed to edit message: ", err.Error())
@@ -156,7 +163,7 @@ func updateCurrentMessage(session *discordgo.Session) string {
 	return msg.ID
 }
 
-func parseReaction(message string) (emoji string, role string) {
+func parseReaction(message string) (emoji Emoji, role string) {
 	trimmed := strings.Trim(message, " ")
 	parts := strings.Fields(trimmed)
 
@@ -164,7 +171,7 @@ func parseReaction(message string) (emoji string, role string) {
 		fmt.Println("Warning: reaction / role message might have too many spaces")
 	}
 
-	emoji = findEmojiIdentiferInMessage(parts[0])
+	emoji = findEmojiInMessage(parts[0])
 	role = strings.Trim(parts[len(parts) - 1], "<@&>")
 	return
 }

@@ -29,7 +29,7 @@ func handle(session *discordgo.Session, reaction *discordgo.MessageReaction, add
 		return
 	}
 
-	emoji := fincEmojiIdentifierInReactionEmoji(reaction.Emoji)
+	emoji := findEmojiIdentifierInReactionEmoji(reaction.Emoji)
 
 	role, contains := rr.Reactions[emoji]
 	if !contains {

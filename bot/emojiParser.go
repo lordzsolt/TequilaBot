@@ -3,8 +3,6 @@ package bot
 import (
 	"fmt"
 	"strings"
-
-	"github.com/bwmarrin/discordgo"
 )
 
 type Emoji struct {
@@ -46,12 +44,3 @@ func findEmojiInMessage(s string) Emoji {
 	}
 }
 
-func findEmojiIdentifierInReactionEmoji(emoji discordgo.Emoji) string {
-	if len(emoji.ID) == 0 {
-		// Simple emoji
-		return emoji.Name
-	}
-
-	// Custom emoji
-	return emoji.ID
-}

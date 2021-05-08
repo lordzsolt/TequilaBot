@@ -81,11 +81,11 @@ func handleConfigurationMessage(session *discordgo.Session, message *discordgo.M
 		}
 
 		sendReply(session, "Perfect. This is how your message will look like:")
-		roleReactionBeingConfigured.MessageID = sendCurrentMessage(session)
+		postCurrentMessage(session)
 	case 3:
 		if isBotCommand(message, "done") {
 			// TODO: Add option to jump to steps and make corrections
-			_= sendCurrentMessage(session)
+			postCurrentMessage(session)
 			break
 		}
 
@@ -127,21 +127,6 @@ func handleConfigurationMessage(session *discordgo.Session, message *discordgo.M
 	sendReply(session, configurationMessages[configurationStep])
 }
 
-func sendCurrentMessage(session *discordgo.Session) string {
-	msg, err := session.ChannelMessageSendComplex(config.SetupChannelID, roleReactionBeingConfigured.toDiscordMessage())
-
-	if err != nil {
-		fmt.Println("Failed to send message: ", err.Error())
-	}
-
-	if msg == nil {
-		fmt.Println("For some reason, error is nil, but msg is also nil")
-		return ""
-	}
-
-	return msg.ID
-}
-
 func updateCurrentMessage(session *discordgo.Session) string {
 	var edit = discordgo.MessageEdit{
 		ID: roleReactionBeingConfigured.MessageID,
@@ -176,15 +161,26 @@ func parseReaction(message string) (emoji Emoji, role string) {
 	return
 }
 
+func postCurrentMessage(session *discordgo.Session) {
+	err := sendMessageToChannel(session, config.SetupChannelID)
+	if err != nil {
+		fmt.Printf("Failed to post current message: %v", err)
+	}
+}
+
 func postFinalMessage(session *discordgo.Session) error {
-	msg, err := session.ChannelMessageSendComplex(roleReactionBeingConfigured.ChannelID, roleReactionBeingConfigured.toDiscordMessage())
+	return sendMessageToChannel(session, roleReactionBeingConfigured.ChannelID)
+}
+
+func sendMessageToChannel(session *discordgo.Session, channelID string) error {
+	msg, err := session.ChannelMessageSendComplex(channelID, roleReactionBeingConfigured.toDiscordMessage())
 
 	if err != nil {
 		return err
 	}
 
-	for emoji, _ := range roleReactionBeingConfigured.Reactions {
-		err := session.MessageReactionAdd(msg.ChannelID, msg.ID, emoji)
+	for _, emoji := range roleReactionBeingConfigured.Emojis {
+		err := session.MessageReactionAdd(msg.ChannelID, msg.ID, emoji.asReaction())
 		if err != nil {
 			return err
 		}

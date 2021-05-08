@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+
+# Mount EFS
+sudo yum install -y amazon-efs-utils
+sudo mkdir /efs
+sudo mount -t efs -o tls fs-41f8231a:/ /efs
+
 set -xe
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"

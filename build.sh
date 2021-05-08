@@ -3,6 +3,7 @@
 # Mount EFS
 sudo yum install -y amazon-efs-utils
 sudo mkdir /efs
+sudo chown webapp /efs
 sudo mount -t efs -o tls fs-41f8231a:/ /efs
 
 set -xe

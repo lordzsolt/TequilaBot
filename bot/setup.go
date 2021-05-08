@@ -14,8 +14,6 @@ type Config struct {
 	SetupChannelID string `json:"setup_channel_id"`
 }
 
-const reactionFileName = "./messages.json"
-
 func ReadConfig() (*Config, error) {
 	fmt.Println("Reading config")
 
@@ -37,13 +35,13 @@ func ReadConfig() (*Config, error) {
 func readReactions() error {
 	fmt.Println("Reading reaction")
 
-	_ , err := os.Stat(reactionFileName)
+	_ , err := os.Stat(reactionFileName())
 	if err != nil && os.IsNotExist(err) {
 		fmt.Println("Reactions file doesn't exist yet.")
 		return nil
 	}
 
-	file, err := ioutil.ReadFile(reactionFileName)
+	file, err := ioutil.ReadFile(reactionFileName())
 	if err != nil {
 		fmt.Printf("Failed to read file: %v", err.Error())
 		return err
@@ -66,7 +64,7 @@ func saveReactions() error {
 		return err
 	}
 
-	err = ioutil.WriteFile(reactionFileName, bytes, 0644)
+	err = ioutil.WriteFile(reactionFileName(), bytes, 0644)
 
 	if err != nil {
 		fmt.Printf("Failed to write file: %v,\n", err)
@@ -74,4 +72,12 @@ func saveReactions() error {
 	}
 
 	return nil
+}
+
+func reactionFileName() string {
+	if os.Getenv("ENV") == "DEV" {
+		return "./messages.json"
+	} else {
+		return "/efs/messages.json"
+	}
 }

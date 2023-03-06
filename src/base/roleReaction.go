@@ -1,4 +1,4 @@
-package bot
+package base
 
 import (
 	"fmt"
@@ -8,24 +8,24 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-type roleReaction struct {
+type RoleReaction struct {
 	MessageID   string            `json:"message_id"`
 	ChannelID   string            `json:"channel_id"`
 	Title       string            `json:"title"`
 	Description string            `json:"description"`
 	Color       int               `json:"color"`
 	Reactions   map[string]string `json:"reactions"`
-	Emojis 		map[string]Emoji  `json:"emojis"`
+	Emojis      map[string]Emoji  `json:"emojis"`
 }
 
-func newRoleReactionMessage() *roleReaction {
-	return &roleReaction{
+func NewRoleReaction() RoleReaction {
+	return RoleReaction{
 		Reactions: map[string]string{},
-		Emojis: map[string]Emoji{},
+		Emojis:    map[string]Emoji{},
 	}
 }
 
-func (rrm roleReaction) toEmbed() *discordgo.MessageEmbed {
+func (rrm *RoleReaction) ToEmbed() *discordgo.MessageEmbed {
 	var embed discordgo.MessageEmbed
 	embed.Title = rrm.Title
 	embed.Description = rrm.Description
@@ -43,21 +43,21 @@ func (rrm roleReaction) toEmbed() *discordgo.MessageEmbed {
 	return &embed
 }
 
-func (rrm roleReaction) toDiscordMessage() *discordgo.MessageSend {
+func (rrm *RoleReaction) ToDiscordMessage() *discordgo.MessageSend {
 	return &discordgo.MessageSend{
-		Embed: rrm.toEmbed(),
+		Embed: rrm.ToEmbed(),
 	}
 }
 
-func (rrm *roleReaction) updateTitleAndDescription(message string) {
+func (rrm *RoleReaction) UpdateTitleAndDescription(message string) {
 	parts := strings.Split(message, "|")
-	roleReactionBeingConfigured.Title = parts[0]
+	rrm.Title = parts[0]
 	if len(parts) > 1 {
-		roleReactionBeingConfigured.Description = parts[1]
+		rrm.Description = parts[1]
 	}
 }
 
-func (rrm *roleReaction) updateColor(message string) error {
+func (rrm *RoleReaction) UpdateColor(message string) error {
 	if message == "none" {
 		return nil
 	}
@@ -68,6 +68,6 @@ func (rrm *roleReaction) updateColor(message string) error {
 		return err
 	}
 
-	roleReactionBeingConfigured.Color = int(value)
+	rrm.Color = int(value)
 	return nil
 }

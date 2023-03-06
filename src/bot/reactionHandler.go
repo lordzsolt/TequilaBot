@@ -5,10 +5,9 @@ import (
 	"strconv"
 
 	"github.com/bwmarrin/discordgo"
-)
 
-var (
-	watchedMessages = map[string]roleReaction{}
+	"TequilaBot/src/base"
+	"TequilaBot/src/config"
 )
 
 func reactionAdd(session *discordgo.Session, reaction *discordgo.MessageReactionAdd) {
@@ -24,7 +23,7 @@ func handle(session *discordgo.Session, reaction *discordgo.MessageReaction, add
 		return
 	}
 
-	rr, contains := watchedMessages[reaction.MessageID]
+	rr, contains := base.WatchedMessages[reaction.MessageID]
 	if !contains {
 		return
 	}
@@ -38,9 +37,9 @@ func handle(session *discordgo.Session, reaction *discordgo.MessageReaction, add
 
 	var err error
 	if add {
-		err = session.GuildMemberRoleAdd(config.GuildID, reaction.UserID, role)
+		err = session.GuildMemberRoleAdd(config.Current.GuildID, reaction.UserID, role)
 	} else {
-		err = session.GuildMemberRoleRemove(config.GuildID, reaction.UserID, role)
+		err = session.GuildMemberRoleRemove(config.Current.GuildID, reaction.UserID, role)
 	}
 
 	if err != nil {

@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
 
-# Mount EFS
-sudo yum install -y amazon-efs-utils
-sudo mkdir /efs
-sudo chown webapp /efs
-sudo mount -t efs -o tls fs-41f8231a:/ /efs
-
 set -xe
 
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-export GOPATH="$SCRIPT_DIR/vendor"
+DESTINATION=lord@iosmith.com
 
-go build -o bin/bot .
+GOOS=linux GOARCH=amd64 go build -o bin/app-amd64-linux .
+
+ssh $DESTINATION 'sudo systemctl stop saltbot.service'
+scp config.json $DESTINATION:/home/saltbot/config.json
+scp bin/app-amd64-linux $DESTINATION:/home/saltbot/saltbot.bin
+ssh $DESTINATION 'sudo systemctl start saltbot.service'

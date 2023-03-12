@@ -24,3 +24,26 @@ func SendReply(session *discordgo.Session, message string) {
 		fmt.Println("Failed to send message: ", err.Error())
 	}
 }
+
+func SendReactionToChannel(session *discordgo.Session, reaction RoleReaction, channelID string, includeEmojis bool) (string, error) {
+	var messageID string
+	msg, err := session.ChannelMessageSendComplex(channelID, reaction.ToDiscordMessage())
+
+	if err != nil {
+		return messageID, err
+	}
+	messageID = msg.ID
+
+	if !includeEmojis {
+		return messageID, nil
+	}
+
+	for _, emoji := range reaction.Emojis {
+		err := session.MessageReactionAdd(msg.ChannelID, msg.ID, emoji.AsReaction())
+		if err != nil {
+			return messageID, err
+		}
+	}
+
+	return messageID, nil
+}

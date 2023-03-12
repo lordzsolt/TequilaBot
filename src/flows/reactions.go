@@ -109,29 +109,10 @@ func (f *reactionsFlow) HandleMessage(session *discordgo.Session, message *disco
 }
 
 func (f *reactionsFlow) postCurrentMessage(session *discordgo.Session) {
-	err := f.sendMessageToChannel(session, config.Current.SetupChannelID)
+	_, err := base.SendReactionToChannel(session, f.message, config.Current.SetupChannelID, true)
 	if err != nil {
 		fmt.Printf("Failed to post current message: %v", err)
 	}
-}
-
-func (f *reactionsFlow) sendMessageToChannel(session *discordgo.Session, channelID string) error {
-	msg, err := session.ChannelMessageSendComplex(channelID, f.message.ToDiscordMessage())
-
-	if err != nil {
-		return err
-	}
-
-	for _, emoji := range f.message.Emojis {
-		err := session.MessageReactionAdd(msg.ChannelID, msg.ID, emoji.AsReaction())
-		if err != nil {
-			return err
-		}
-	}
-
-	f.message.MessageID = msg.ID
-
-	return nil
 }
 
 func parseReaction(message string) (emoji base.Emoji, role string) {
@@ -169,7 +150,13 @@ func (f *reactionsFlow) updateCurrentMessage(session *discordgo.Session) string 
 }
 
 func (f *reactionsFlow) postFinalMessage(session *discordgo.Session) error {
-	return f.sendMessageToChannel(session, f.message.ChannelID)
+	messageID, err := base.SendReactionToChannel(session, f.message, config.Current.SetupChannelID, true)
+	if err != nil {
+		fmt.Printf("Failed to post current message: %v", err)
+	} else {
+		f.message.MessageID = messageID
+	}
+	return err
 }
 
 func (f *reactionsFlow) finishConfiguring() {

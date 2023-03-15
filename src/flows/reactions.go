@@ -14,7 +14,7 @@ func NewReactionsFlow() Flow {
 	return &reactionsFlow{}
 }
 
-var configurationMessages = [...]string{
+var reactionsPrompts = [...]string{
 	"Step 1: Which channel would you like the message to be in?",
 	"Step 2: How would you like your message to look like? Use a `|` to separate the title from the description, like so:\n" +
 		"> `Title | Description`",
@@ -28,14 +28,15 @@ var configurationMessages = [...]string{
 }
 
 type reactionsFlow struct {
-	step    int
-	message base.RoleReaction
+	step            int
+	targetChannelID string
+	message         base.RoleReaction
 }
 
 func (f *reactionsFlow) Start(session *discordgo.Session) {
-	f.step = 0
 	f.message = base.NewRoleReaction()
-	base.SendReply(session, configurationMessages[f.step])
+	f.message.ChannelID = config.Current.SetupChannelID
+	base.SendReply(session, reactionsPrompts[f.step])
 }
 
 func (f *reactionsFlow) HandleMessage(session *discordgo.Session, message *discordgo.MessageCreate) Flow {
@@ -45,9 +46,8 @@ func (f *reactionsFlow) HandleMessage(session *discordgo.Session, message *disco
 
 	switch f.step {
 	case 0:
-		ChannelID := strings.Trim(message.Content, "<#>")
-		f.message.ChannelID = ChannelID
-		reply := fmt.Sprintf("Alright. The channel is <#%s>", ChannelID)
+		f.targetChannelID = strings.Trim(message.Content, "<#>")
+		reply := fmt.Sprintf("Alright. The channel is <#%s>", f.targetChannelID)
 		base.SendReply(session, reply)
 	case 1:
 		f.message.UpdateTitleAndDescription(message.Content)
@@ -68,14 +68,8 @@ func (f *reactionsFlow) HandleMessage(session *discordgo.Session, message *disco
 			break
 		}
 
-		emoji, r := parseReaction(message.Content)
-
-		// TODO: Make sure role exists
-
-		f.message.Reactions[emoji.Name] = r
-		f.message.Emojis[emoji.Name] = emoji
-		f.message.MessageID = f.updateCurrentMessage(session)
-
+		emoji := f.message.UpdateEmojiAndRole(message.Content)
+		base.EditingExistingRoleReaction(session, f.message)
 		err := session.MessageReactionAdd(config.Current.SetupChannelID, f.message.MessageID, emoji.AsReaction())
 		if err != nil {
 			fmt.Println("Error adding reaction: ", err.Error())
@@ -83,6 +77,9 @@ func (f *reactionsFlow) HandleMessage(session *discordgo.Session, message *disco
 
 		return f
 	case 4:
+		if base.IsBotCommand(message, "no") {
+			return NewListeningFlow()
+		}
 		if base.IsBotCommand(message, "yes") {
 			err := f.postFinalMessage(session)
 			if err != nil {
@@ -94,9 +91,8 @@ func (f *reactionsFlow) HandleMessage(session *discordgo.Session, message *disco
 				return NewListeningFlow()
 
 			}
-		} else if base.IsBotCommand(message, "no") {
-			return NewListeningFlow()
 		}
+		return f
 	default:
 		fmt.Println("Unknown configuration step: ", f.step)
 		f.step = 0
@@ -104,56 +100,24 @@ func (f *reactionsFlow) HandleMessage(session *discordgo.Session, message *disco
 	}
 
 	f.step += 1
-	base.SendReply(session, configurationMessages[f.step])
+	base.SendReply(session, reactionsPrompts[f.step])
 	return f
 }
 
 func (f *reactionsFlow) postCurrentMessage(session *discordgo.Session) {
-	_, err := base.SendReactionToChannel(session, f.message, config.Current.SetupChannelID, true)
-	if err != nil {
-		fmt.Printf("Failed to post current message: %v", err)
-	}
-}
-
-func parseReaction(message string) (emoji base.Emoji, role string) {
-	trimmed := strings.Trim(message, " ")
-	parts := strings.Fields(trimmed)
-
-	if len(parts) > 2 {
-		fmt.Println("Warning: reaction / role message might have too many spaces")
-	}
-
-	emoji = base.FindEmojiInMessage(parts[0])
-	role = strings.Trim(parts[len(parts)-1], "<@&>")
-	return
-}
-
-func (f *reactionsFlow) updateCurrentMessage(session *discordgo.Session) string {
-	var edit = discordgo.MessageEdit{
-		ID:      f.message.MessageID,
-		Channel: config.Current.SetupChannelID,
-		Embed:   f.message.ToEmbed(),
-	}
-
-	msg, err := session.ChannelMessageEditComplex(&edit)
-
-	if err != nil {
-		fmt.Println("Failed to edit message: ", err.Error())
-	}
-
-	if msg == nil {
-		fmt.Println("For some reason, error is nil, but msg is also nil")
-		return ""
-	}
-
-	return msg.ID
-}
-
-func (f *reactionsFlow) postFinalMessage(session *discordgo.Session) error {
 	messageID, err := base.SendReactionToChannel(session, f.message, config.Current.SetupChannelID, true)
 	if err != nil {
 		fmt.Printf("Failed to post current message: %v", err)
+	}
+	f.message.MessageID = messageID
+}
+
+func (f *reactionsFlow) postFinalMessage(session *discordgo.Session) error {
+	messageID, err := base.SendReactionToChannel(session, f.message, f.targetChannelID, true)
+	if err != nil {
+		fmt.Printf("Failed to post current message: %v", err)
 	} else {
+		f.message.ChannelID = f.targetChannelID
 		f.message.MessageID = messageID
 	}
 	return err

@@ -71,3 +71,21 @@ func (rrm *RoleReaction) UpdateColor(message string) error {
 	rrm.Color = int(value)
 	return nil
 }
+
+func (rrm *RoleReaction) UpdateEmojiAndRole(message string) Emoji {
+	trimmed := strings.Trim(message, " ")
+	parts := strings.Fields(trimmed)
+
+	if len(parts) > 2 {
+		fmt.Println("Warning: reaction / role message might have too many spaces")
+	}
+
+	emoji := FindEmojiInMessage(parts[0])
+	role := strings.Trim(parts[len(parts)-1], "<@&>")
+
+	// TODO: Make sure role exists
+
+	rrm.Reactions[emoji.Name] = role
+	rrm.Emojis[emoji.Name] = emoji
+	return emoji
+}

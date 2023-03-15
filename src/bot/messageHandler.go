@@ -3,6 +3,7 @@ package bot
 import (
 	"github.com/bwmarrin/discordgo"
 
+	"TequilaBot/src/base"
 	"TequilaBot/src/config"
 	"TequilaBot/src/flows"
 )
@@ -19,7 +20,12 @@ func messageCreated(session *discordgo.Session, message *discordgo.MessageCreate
 		return
 	}
 
-	nextFlow := currentFlow.HandleMessage(session, message)
+	var nextFlow flows.Flow
+	if base.IsBotCommand(message, "abort") {
+		nextFlow = flows.NewListeningFlow()
+	} else {
+		nextFlow = currentFlow.HandleMessage(session, message)
+	}
 
 	if nextFlow != currentFlow {
 		nextFlow.Start(session)

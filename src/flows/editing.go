@@ -46,6 +46,7 @@ func (f *editingFlow) HandleMessage(session *discordgo.Session, message *discord
 		err := f.detectReaction(session, message)
 		if err != nil {
 			fmt.Printf("Failed to start editing flow: %v", err.Error())
+			return f
 		}
 		f.nextStep(session)
 	case 1:
@@ -71,7 +72,7 @@ func (f *editingFlow) HandleMessage(session *discordgo.Session, message *discord
 		f.roleReaction.ChannelID = f.originalChannelID
 		base.EditingExistingRoleReaction(session, *f.roleReaction)
 		for _, emoji := range f.roleReaction.Emojis {
-			err := session.MessageReactionAdd(config.Current.SetupChannelID, f.roleReaction.MessageID, emoji.AsReaction())
+			err := session.MessageReactionAdd(f.roleReaction.ChannelID, f.roleReaction.MessageID, emoji.AsReaction())
 			if err != nil {
 				fmt.Println("Error adding reaction: ", err.Error())
 			}
@@ -120,5 +121,6 @@ func (f *editingFlow) detectReaction(session *discordgo.Session, message *discor
 	}
 
 	f.roleReaction.MessageID = messageID
+	f.roleReaction.ChannelID = config.Current.SetupChannelID
 	return nil
 }
